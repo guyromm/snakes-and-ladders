@@ -2,12 +2,10 @@ import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
 import StartApp.Simple as StartApp
-import Signal exposing (Address)
 import Dict exposing (Dict)
 import String
 import Debug
 import Random
-import List.Extra
 
 type alias DiceState = Int
                
@@ -17,6 +15,8 @@ diceStates = [1..6]
 type Action =
             NoOp
             | RollDice
+            | PlayThrough
+            | NewGame
 
 type PlayerState =
                  Playing
@@ -57,60 +57,49 @@ type alias Model = {
    ,whoseTurn : Maybe PlayerName
    ,turnCount : Int
    ,gameOver : Bool
+   ,gameCount : Int
     }
 
 
 initialModel : Model
--- initialModel =
---   {
---     players = [Player "a" Playing 0 0,Player "b" Playing 0 0]
---     ,seed = Random.initialSeed 42
---     ,lastRoll = Nothing
---     ,whoseTurn = Just "a"
---     ,turnCount = 0
---     ,gameOver = False
---   }
-
 initialModel =
   {
-    players = [Player "a" Finished 99 666,Player "b" Finished 99 666]
+    players = [Player "a" Playing 0 0
+               ,Player "b" Playing 0 0
+               ,Player "c" Playing 0 0
+              ]
     ,seed = Random.initialSeed 42
     ,lastRoll = Nothing
-    ,whoseTurn = Just "b"
+    ,whoseTurn = Just "a"
     ,turnCount = 0
     ,gameOver = False
+    ,gameCount = 0
   }
 
-unsafeNth : Int -> List a -> a
-unsafeNth n xs = case List.drop n xs of
-                   [] -> Debug.crash "attempted to take nonexistant!"
-                   (x::_) -> x
-
-                             
 obtainPlayer : PlayerName -> List Player -> Maybe Player
 obtainPlayer pn players =
   case players of
     [] ->
       Nothing
     _ ->
-      Just (unsafeNth 0 (List.filter (\p -> p.name == pn) players))
+      List.head (List.filter (\p -> p.name == pn) players)
 
+-- return next player, indication whether game turn count has advanced
 obtainNext : PlayerName -> List Player -> (Maybe Player,Int)
 obtainNext pn ingame =
   let
-    next = Debug.log "next are " List.filter (\p -> (p.name > pn)) ingame
+    cur = List.filter (\p -> (p.name > pn)) ingame
   in
-    case next of
+    case cur of
       [] ->
         case ingame of
           [] ->
             (Nothing,0)
           _ ->
-            ((Just (unsafeNth 0 ingame)),1)
+            (List.head ingame,1)
       _ ->
-        (Just (unsafeNth 0 next),0)
+        (List.head cur,0)
 
-                
 makeMove : DiceState -> Player -> Player
 makeMove ds p =
   let
@@ -128,50 +117,65 @@ nextClean nt =
     Just n ->
       n.name
 
---replcond : Maybe Player -> Bool
+replcond : Maybe Player -> Player -> Player
+replcond playing p =
+  case playing of
+    Just playing ->
+      if p.name==playing.name then playing else p
+    Nothing ->
+      p
 
-update : Action -> Model -> Model
-update action model =
-  case action of
-    NoOp ->
-      model
-    RollDice ->
-      let
+advanceState : Model -> Bool -> Model
+advanceState model recurse =
+    let
         -- who's in game?
-        ingame = Debug.log "still in game" (List.filter (\p -> p.state==Playing) model.players)
-        -- is game over?
-        gameOver = List.length ingame  == 0
+        ingame = List.filter (\p -> p.state==Playing) model.players
         -- obtain current player
         playing = Debug.log "obtainPlayer returned " (obtainPlayer (Maybe.withDefault "--" model.whoseTurn) ingame)
         -- roll dice 
         (dr,seed') = Random.generate (Random.int 1 6 ) model.seed
         -- make the move
         playing' = Maybe.map (makeMove dr) playing
-        -- playing' = mm dr -- makeMove playing dr
-        -- newpos = Debug.log "player made move. now at  " playing'.position
-        -- evaluate whether a victory has occured
         -- update model.players
-        replcond p =
-          case p of
-            Just p ->
-              p.name==playing
-            Nothing ->
-              False
-        players' = List.Extra.replaceIf replcond playing' model.players
+        replcond' = replcond playing'
+        players' = List.map replcond' model.players
         -- update whoseTurn
         ingame' = List.filter (\p -> p.state==Playing) players'
-
         (newTurn,incTurnCount) = Debug.log "it's now the turn of " (obtainNext (Maybe.withDefault "--" model.whoseTurn) ingame')
         newTurnName = nextClean newTurn
-      in
-        Debug.log "updated:" { model |
+        -- is game over?
+        gameOver = List.length ingame'  == 0
+        gameCount' = if gameOver then model.gameCount+1 else model.gameCount
+        model' = { model |
                   seed = seed',
                   lastRoll = Just dr ,
                   players = players',
                   whoseTurn = Just newTurnName,
                   turnCount=model.turnCount+incTurnCount,
-                  gameOver=gameOver
+                  gameOver=gameOver,
+                  gameCount=gameCount'
         }
+      in
+        if (recurse && not model'.gameOver) then (advanceState model' recurse) else model'
+
+update : Action -> Model -> Model
+update action model =
+  case action of
+    NoOp ->
+      model
+    PlayThrough ->
+      let
+        model' = advanceState model True
+      in
+        model'
+    NewGame ->
+      let
+        seed' = model.seed
+        gameCount' = model.gameCount
+      in
+        { initialModel | seed = seed' , gameCount=gameCount'}
+    RollDice ->
+      advanceState model False
 
 renderCell : Int -> Int -> List Player -> String
 renderCell rid cellid players =
@@ -187,20 +191,14 @@ renderCell rid cellid players =
     dispP = disp ++ (String.join ","  (List.map (\p -> p.name)  cellPlayers))
   in
     dispP
---  toString cellid
 
-
---view : address -> model -> Html
 drawBoard address model =
   let
     header = [td [] [ text "\\" ]] ++ List.map (\hid -> td [] [ text (toString hid)]) [0..9]
     rows = List.map (\rid -> tr []
                              (
-                             [
-                              td [] [text ((toString rid))]
-                             ] ++
+                             [ td [] [text ((toString rid))] ] ++
                               List.map (\cellid -> td [] [text (renderCell rid cellid model.players)]) [0..9]
-
                               )
                     ) [0..9]
     cells = List.map (\cellid -> [0..10]) rows
@@ -211,9 +209,15 @@ drawBoard address model =
 drawControls address model =
   let
     finished = List.map (\p -> p.name) (List.filter (\p -> p.state==Finished) model.players)
-    dis = if model.gameOver then [ onClick address RollDice , attribute "disabled" "1" ] else [onClick address RollDice]
+    attrdis = if model.gameOver then [ attribute "disabled" "1" ] else []
+    attren = if model.gameOver then [] else [ attribute "disabled" "1" ]
+    dis = [ onClick address RollDice ] ++ attrdis
+    dis2 = [ onClick address PlayThrough ] ++ attrdis
+    dis3 = [ onClick address NewGame ] ++ attren
   in
     div [] [ button dis [ text "Roll dice" ],
+             button dis2 [ text "Play through" ],
+             button dis3 [ text "New game" ],
                     span [] [ text ("Turn "++(toString model.turnCount))],
                     div [] [ ],
                     span [] [ text ("Last roll is " ++ (toString (Maybe.withDefault 0 model.lastRoll)))],
@@ -222,9 +226,11 @@ drawControls address model =
                     div [] [ ],
                     span [] [ text ("Finished: " ++ String.join "," finished)],
                     div [] [ ],
-                    span [] [ text ("Is game over?: " ++ (if model.gameOver then "YES" else "NO"))]
+                    span [] [ text ("Is game over?: " ++ (if model.gameOver then "YES" else "NO"))],
+                    div [] [ ],
+                    span [] [ text ("game count: " ++ (toString model.gameCount))]                         
            ]
-         
+
 view address model =
   let
     board = drawBoard address model
@@ -232,7 +238,4 @@ view address model =
   in
     div [] [board , ctrl]
 
-main =
-  StartApp.start { model = initialModel,
-                           view = view,
-                           update = update }
+main = StartApp.start { model = initialModel,view = view,update = update }
