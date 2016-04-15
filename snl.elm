@@ -14,8 +14,6 @@ type alias DiceState = Int
 diceStates : List DiceState
 diceStates = [1..6]
 
-                                                                               
-            
 type Action =
             NoOp
             | RollDice
@@ -43,6 +41,7 @@ snakesLadders = Dict.fromList [
                  (84, 71),
                  (88, 36)
              ]
+
 type alias PlayerName = String
                       
 type alias Player = { name : PlayerName,
@@ -86,14 +85,15 @@ unsafeNth : Int -> List a -> a
 unsafeNth n xs = case List.drop n xs of
                    [] -> Debug.crash "attempted to take nonexistant!"
                    (x::_) -> x
-                                                                                          
-obtainPlayer : PlayerName -> List Player -> Player
+
+                             
+obtainPlayer : PlayerName -> List Player -> Maybe Player
 obtainPlayer pn players =
   case players of
     [] ->
-      Debug.crash "players is empty!"
+      Nothing
     _ ->
-      unsafeNth 0 (List.filter (\p -> p.name == pn) players)
+      Just (unsafeNth 0 (List.filter (\p -> p.name == pn) players))
 
 obtainNext : PlayerName -> List Player -> (Maybe Player,Int)
 obtainNext pn ingame =
@@ -111,8 +111,8 @@ obtainNext pn ingame =
         (Just (unsafeNth 0 next),0)
 
                 
-makeMove : Player -> DiceState -> Player
-makeMove p ds =
+makeMove : DiceState -> Player -> Player
+makeMove ds p =
   let
     pos = p.position+ds
     delt = Debug.log "pos?" (Dict.get pos snakesLadders)
@@ -127,7 +127,9 @@ nextClean nt =
       "--"
     Just n ->
       n.name
-              
+
+--replcond : Maybe Player -> Bool
+
 update : Action -> Model -> Model
 update action model =
   case action of
@@ -136,19 +138,26 @@ update action model =
     RollDice ->
       let
         -- who's in game?
-        ingame = List.filter (\p -> p.state==Playing) model.players
+        ingame = Debug.log "still in game" (List.filter (\p -> p.state==Playing) model.players)
         -- is game over?
         gameOver = List.length ingame  == 0
         -- obtain current player
-        playing = obtainPlayer (Maybe.withDefault "--" model.whoseTurn) ingame
+        playing = Debug.log "obtainPlayer returned " (obtainPlayer (Maybe.withDefault "--" model.whoseTurn) ingame)
         -- roll dice 
         (dr,seed') = Random.generate (Random.int 1 6 ) model.seed
-        -- make the move 
-        playing' = makeMove playing dr
-        newpos = Debug.log "player made move. now at  " playing'.position
+        -- make the move
+        playing' = Maybe.map (makeMove dr) playing
+        -- playing' = mm dr -- makeMove playing dr
+        -- newpos = Debug.log "player made move. now at  " playing'.position
         -- evaluate whether a victory has occured
         -- update model.players
-        players' = List.Extra.replaceIf (\p -> p.name==playing.name) playing' model.players
+        replcond p =
+          case p of
+            Just p ->
+              p.name==playing
+            Nothing ->
+              False
+        players' = List.Extra.replaceIf replcond playing' model.players
         -- update whoseTurn
         ingame' = List.filter (\p -> p.state==Playing) players'
 
