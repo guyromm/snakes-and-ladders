@@ -6,6 +6,7 @@ import Dict exposing (Dict)
 import String
 import Debug
 import Random
+import Char
 
 type alias DiceState = Int
                
@@ -64,10 +65,7 @@ type alias Model = {
 initialModel : Model
 initialModel =
   {
-    players = [Player "a" Playing 0 0
-               ,Player "b" Playing 0 0
-               ,Player "c" Playing 0 0
-              ]
+    players = List.map (\i -> Player (String.fromChar (Char.fromCode ((Char.toCode 'a') + i))) Playing 0 0) [0..10]
     ,seed = Random.initialSeed 42
     ,lastRoll = Nothing
     ,whoseTurn = Just "a"
@@ -203,7 +201,7 @@ drawBoard address model =
                     ) [0..9]
     cells = List.map (\cellid -> [0..10]) rows
   in
-    table [ (attribute "border" "1") ]
+    table [ (attribute "border" "1", (style ["width", "100%"])) ]
             ([tr [] header] ++ rows)
 
 drawControls address model =
