@@ -201,7 +201,7 @@ drawBoard address model =
                     ) [0..9]
     cells = List.map (\cellid -> [0..10]) rows
   in
-    table [ (attribute "border" "1", (style ["width", "100%"])) ]
+    table [ (attribute "border" "1") ]
             ([tr [] header] ++ rows)
 
 drawControls address model =
