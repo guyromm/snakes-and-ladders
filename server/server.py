@@ -1,4 +1,4 @@
-from flask import Flask,jsonify
+from flask import Flask,jsonify,render_template
 import psycopg2
 import uuid
 import json
@@ -51,7 +51,10 @@ def vg(state):
         playing = filter(lambda lp: lp['state']=='playing',state['p'])
         if not len(playing) and state['status']!='finished': raise Exception('bad state, game has ended')
     elif state['status']!='pending': raise Exception('how could have a game begun without players')
-    
+
+@app.route("/")
+def index():
+    return render_template('index.html')
 @app.route("/game/new")
 def newgame():
     gid = str(uuid.uuid1())

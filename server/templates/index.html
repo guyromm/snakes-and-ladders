@@ -1,0 +1,16 @@
+<html>
+  <head>
+    <script type='text/javascript' src='static/zepto.js'></script>
+    <script type='text/javascript' src='static/snl.js'></script>
+  </head>
+  <body>
+    <div id="game"></div>
+    <script type='text/javascript'>
+      $(function() {
+      var gamediv = $('#game');
+      Elm.embed(Elm.GameControl,gamediv[0]);
+      });
+    </script>
+  </body>
+</html>
+

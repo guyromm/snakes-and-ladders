@@ -1,3 +1,5 @@
+module Snl where
+
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
@@ -229,6 +231,7 @@ drawControls address model =
                     span [] [ text ("game count: " ++ (toString model.gameCount))]                         
            ]
 
+view : Signal.Address Action -> Model -> Html
 view address model =
   let
     board = drawBoard address model
