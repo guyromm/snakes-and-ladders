@@ -54,7 +54,8 @@ type alias Player = { name : PlayerName,
                                  }
 
 type alias Model = {
-    players : List Player
+    id : String
+    ,players : List Player
    ,seed : Random.Seed
    ,lastRoll : Maybe DiceState
    ,whoseTurn : Maybe PlayerName
@@ -67,7 +68,8 @@ type alias Model = {
 initialModel : Model
 initialModel =
   {
-    players = List.map (\i -> Player (String.fromChar (Char.fromCode ((Char.toCode 'a') + i))) Playing 0 0) [0..10]
+    id = ""
+    ,players = List.map (\i -> Player (String.fromChar (Char.fromCode ((Char.toCode 'a') + i))) Playing 0 0) [0..10]
     ,seed = Random.initialSeed 42
     ,lastRoll = Nothing
     ,whoseTurn = Just "a"

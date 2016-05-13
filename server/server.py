@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 from flask import Flask,jsonify,render_template
 import psycopg2
 import uuid
@@ -69,8 +71,10 @@ def newgame():
     ins = {'gid':gid,'state':json.dumps(s)}
     cur.execute("insert into games (id,state) values(%(gid)s,%(state)s)",ins)
     cur.execute("commit")
-    return jsonify(ins)
-
+    return jsonify({'gid':gid,'state':s})
+@app.route("/test")
+def test():
+    return str(random.random())
 @app.route("/game/<gid>/state")
 def gamestate(gid):
     rt = gg(gid)
