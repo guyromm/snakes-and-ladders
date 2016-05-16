@@ -1,9 +1,9 @@
-module Snl where
+module Snl exposing (..)
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
-import StartApp.Simple as StartApp
+import Html.App
 import Dict exposing (Dict)
 import String
 import Debug
@@ -15,7 +15,7 @@ type alias DiceState = Int
 diceStates : List DiceState
 diceStates = [1..6]
 
-type Action =
+type Msg =
             NoOp
             | RollDice
             | PlayThrough
@@ -135,7 +135,7 @@ advanceState model recurse =
         -- obtain current player
         playing = Debug.log "obtainPlayer returned " (obtainPlayer (Maybe.withDefault "--" model.whoseTurn) ingame)
         -- roll dice 
-        (dr,seed') = Random.generate (Random.int 1 6 ) model.seed
+        (dr,seed') = Random.step (Random.int 1 6 ) model.seed
         -- make the move
         playing' = Maybe.map (makeMove dr) playing
         -- update model.players
@@ -160,7 +160,7 @@ advanceState model recurse =
       in
         if (recurse && not model'.gameOver) then (advanceState model' recurse) else model'
 
-update : Action -> Model -> Model
+update : Msg -> Model -> Model
 update action model =
   case action of
     NoOp ->
@@ -194,7 +194,7 @@ renderCell rid cellid players =
   in
     dispP
 
-drawBoard address model =
+drawBoard model =
   let
     header = [td [] [ text "\\" ]] ++ List.map (\hid -> td [] [ text (toString hid)]) [0..9]
     rows = List.map (\rid -> tr []
@@ -208,18 +208,18 @@ drawBoard address model =
     table [ (attribute "border" "1") ]
             ([tr [] header] ++ rows)
 
-drawControls address model =
+drawControls model =
   let
     finished = List.map (\p -> p.name) (List.filter (\p -> p.state==Finished) model.players)
     attrdis = if model.gameOver then [ attribute "disabled" "1" ] else []
     attren = if model.gameOver then [] else [ attribute "disabled" "1" ]
-    dis = [ onClick address RollDice ] ++ attrdis
-    dis2 = [ onClick address PlayThrough ] ++ attrdis
-    dis3 = [ onClick address NewGame ] ++ attren
+    dis = [ onClick  RollDice ] ++ attrdis
+    dis2 = [ onClick PlayThrough ] ++ attrdis
+--    dis3 = [ onClick NewGame ] ++ attren
   in
     div [] [ button dis [ text "Roll dice" ],
              button dis2 [ text "Play through" ],
-             button dis3 [ text "New game" ],
+--             button dis3 [ text "New game" ],
                     span [] [ text ("Turn "++(toString model.turnCount))],
                     div [] [ ],
                     span [] [ text ("Last roll is " ++ (toString (Maybe.withDefault 0 model.lastRoll)))],
@@ -233,12 +233,13 @@ drawControls address model =
                     span [] [ text ("game count: " ++ (toString model.gameCount))]                         
            ]
 
-view : Signal.Address Action -> Model -> Html
-view address model =
+view : Model -> Html Msg
+view model =
   let
-    board = drawBoard address model
-    ctrl = drawControls address model
+    board = drawBoard model
+    ctrl = drawControls model
   in
     div [] [board , ctrl]
 
-main = StartApp.start { model = initialModel,view = view,update = update }
+main = Html.App.beginnerProgram { model = initialModel,view = view,update = update }
+

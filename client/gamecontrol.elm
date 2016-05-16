@@ -1,12 +1,11 @@
-module GameControl where
+module GameControl exposing (..)
 
 import Html exposing (..)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onClick)
 
 import Snl
-import StartApp.Simple exposing (start)
-import Signal
+import Html.App
 import Task exposing (Task, andThen)
 
 import Debug
@@ -14,7 +13,6 @@ import Debug
 
 import Http
 import Json.Decode exposing ((:=))
-import Effects
 
 type GameState =
                None
@@ -22,11 +20,10 @@ type GameState =
                | Playing
                | Finished
 
-type Action =
+type Msg =
             NoOp
-            | RequestNew
             | New
-            | Game Snl.Action
+            | Game Snl.Msg
                  
 type alias Model = {
     game: Maybe Snl.Model,
@@ -36,66 +33,54 @@ type alias Model = {
 
 initialState : Model
 initialState = {
-  game= Nothing, --Just Snl.initialModel,
+  game= Nothing,
   id=Nothing,
   state=None
   }
 
-view : Signal.Address Action -> Model -> Html
-view address model =
+view : Model -> Html Msg
+view model =
   case model.game of
     Nothing ->
       div []
           [
-           button [ onClick address RequestNew ] [ text "New Game" ]
+           button [ onClick New ] [ text "New Game" ]
           ]
     Just g ->
-      div []
-          [
-           Snl.view (Signal.forwardTo address Game) g,
-           button [ onClick address RequestNew ] [ text "Restart Game" ]
-          ]
+      let
+        _ = Debug.log "hi there bastard" 1
+      in
+        div []
+              [
+               Html.App.map Game (Snl.view g),
+               button [ onClick New ] [ text "Restart Game" ]
+              ]
           
 
 
-update : Action -> Model -> ( Model, Effects.Effects Action)
+update : Msg -> Model -> Model
 update action model =
   case action of
     NoOp ->
-      (model, Effects.none)
+      model
     Game act ->
       case model.game of
         Nothing ->
-          (model, Effects.none)
+          model
         Just mg ->
-          ({ model | game = Just (Snl.update act mg) } , Effects.none)
-    RequestNew ->
-      (model, fetchTest)
+          { model | game = Just (Snl.update act mg) }
     New ->
-        ({ model | game = Nothing }, Effects.none)
+        { model | game = Just (Snl.initialModel) }
 
 type alias NewGameResponse = {
     gid : String,
-    state : String -- Snl.Model
+    state : String
     }
-
-
-actions : Signal.Mailbox Action
-actions =
-  Signal.mailbox NoOp
-
--- report : String -> Task x ()
-report markdown =
-  Signal.send actions.address (Debug.log "test result" markdown)
-                   
-
-port fetchTest : Effects.Effects Action
-port fetchTest =
-  Http.getString "/test" |> Effects.task -- `andThen` Task ()
                            
                       
 main =
-    StartApp.Simple.start { model = initialState,
+    Html.App.beginnerProgram { model = initialState,
             update = update,
             view = view }
           
+
