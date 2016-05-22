@@ -42,12 +42,12 @@ def sg(gid,state):
 def vg(state):
     "validate the game state"
     assert state['status'] in gamestates;
-    if state['turn_count'] and state['status']=='pending': raise Exception('bad state, game begun')
+    if state['turnCount'] and state['status']=='pending': raise Exception('bad state, game begun')
     for p in state['p']:
         assert p['state'] in playerstates
         if p['turns_taken'] and state['status']=='pending': raise Exception('bad state, game has begun')
-    if state['whose_turn']:
-        p = [p for p in state['p'] if p['id']==state['whose_turn']][0]
+    if state['whoseTurn']:
+        p = [p for p in state['p'] if p['id']==state['whoseTurn']][0]
         assert p['state']!='finished'
     if len(state['p']):
         playing = filter(lambda lp: lp['state']=='playing',state['p'])
@@ -63,9 +63,9 @@ def newgame():
     cur = db.cursor()
     s = {'p':[],
          'status':'pending',
-         'last_roll':None,
-         'whose_turn':None,
-         'turn_count':0,
+         'lastRoll':None,
+         'whoseTurn':None,
+         'turnCount':0,
          'gameOver':False,
     }
     ins = {'gid':gid,'state':json.dumps(s)}
@@ -91,7 +91,7 @@ def make_turn(gid):
     #early exit if no one is playing
     if not len(playing): return jsonify(s)
     
-    p = [p for p in s['p'] if p['id']==s['whose_turn']][0]
+    p = [p for p in s['p'] if p['id']==s['whoseTurn']][0]
 
     #roll the dice for current player
     roll = random.choice(dicestates)
@@ -107,7 +107,7 @@ def make_turn(gid):
     #determine next available player
     if not len(playing):
         s['status']='finished'
-        s['whose_turn']=None
+        s['whoseTurn']=None
     else:
         i = playing.index(p)
         if len(playing)-1>=i+1:
@@ -115,12 +115,12 @@ def make_turn(gid):
 
         else:
             np = playing[0]
-            s['turn_count']+=1
+            s['turnCount']+=1
         playing = filter(lambda lp: lp['state']=='playing',s['p'])
         if len(playing):
-            s['whose_turn']=np['id']
+            s['whoseTurn']=np['id']
         else:
-            s['whose_turn']=None
+            s['whoseTurn']=None
             s['status']='finished'
     sg(gid,s)
     return jsonify(s)
@@ -134,7 +134,7 @@ def addplayer(gid):
          'position':0,
          'turns_taken':0}
     s['p'].append(p)
-    if not s['whose_turn']: s['whose_turn']=pid
+    if not s['whoseTurn']: s['whoseTurn']=pid
     vg(s)
     sg(gid,s)
     return jsonify(s)

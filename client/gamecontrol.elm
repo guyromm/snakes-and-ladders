@@ -1,8 +1,10 @@
 module GameControl exposing (..)
 
+import Random exposing (Seed)
+import Json.Decode exposing (..)
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onClick)
+import Html.Events exposing (..)
 
 import Snl
 import Html.App
@@ -12,7 +14,7 @@ import Debug
 
 
 import Http
-import Json.Decode exposing ((:=))
+
 
 type GameState =
                None
@@ -23,6 +25,8 @@ type GameState =
 type Msg =
             NoOp
             | New
+            | NewReturned String --Snl.Model
+            | NewFailed Http.Error
             | Game Snl.Msg
                  
 type alias Model = {
@@ -31,6 +35,13 @@ type alias Model = {
     state: GameState
   }
 
+apply : Decoder (a -> b) -> Decoder a -> Decoder b
+apply f aDecoder =
+  f `Json.Decode.andThen` (\f' -> f' `map` aDecoder)
+              
+(|:) : Decoder (a -> b) -> Decoder a -> Decoder b
+(|:) = apply
+                               
 initialState : Model
 initialState = {
   game= Nothing,
@@ -58,28 +69,80 @@ view model =
           
 
 
-update : Msg -> Model -> Model
+update : Msg -> Model -> (Model,Cmd Msg)
 update action model =
   case action of
+    -- New ->
+    --     { model | game = Just (Snl.initialModel) }
+    New ->
+      (model, requestNewGame)
+    NewReturned g ->
+      (model, Cmd.none)
+    NewFailed e ->
+      (model, Cmd.none)
     NoOp ->
-      model
+      (model, Cmd.none)
     Game act ->
       case model.game of
         Nothing ->
-          model
+          (model, Cmd.none)
         Just mg ->
-          { model | game = Just (Snl.update act mg) }
-    New ->
-        { model | game = Just (Snl.initialModel) }
+          ({ model | game = Just (Snl.update act mg) }, Cmd.none)
 
 type alias NewGameResponse = {
     gid : String,
     state : String
     }
                            
-                      
+subscriptions : Model -> Sub Msg
+subscriptions model =
+  Sub.none
+
+playerStateDecoder : String -> Decoder Snl.PlayerState
+playerStateDecoder status = succeed (playerState status)
+
+playerState : String -> Snl.PlayerState
+playerState status =
+  case status of
+    "playing" -> Snl.Playing
+    "finished" -> Snl.Finished
+
+playerDecoder = succeed Snl.Player
+                |: ("name" := string)
+                |: (("state" := string) `Json.Decode.andThen` playerStateDecoder)
+                |: ("position" := int)
+                |: ("turnsTaken" := int)
+
+
+-- gameStateDecoder : Decoder Snl.Model
+gameStateDecoder = succeed Snl.Model
+                   |: ("players" := Json.Decode.list playerDecoder)
+                   |: ("seed" := (succeed (Random.initialSeed 42)))
+                   |: (maybe ("lastRoll" := int))
+                   |: (maybe ("whoseTurn" := string))
+                   |: ("turnCount" := int)
+                   |: ("gameOver" := bool)
+                     
+-- decodeNewGameResponse : Decoder Snl.Model
+-- decodeNewGameResponse =
+--   let
+--     res = at ["state"] gameStateDecoder
+--   in
+--     res
+--    Snl.initialModel
+    -- { players = [],
+    --   lastRoll = 1
+    -- }
+
+      
+requestNewGame : Cmd Msg
+requestNewGame =
+  Task.perform NewFailed NewReturned (Http.get gameStateDecoder "/game/new")
+     
 main =
-    Html.App.beginnerProgram { model = initialState,
+    Html.App.program {
+            init = (initialState, Cmd.none),
+            subscriptions = subscriptions,           
             update = update,
             view = view }
           
