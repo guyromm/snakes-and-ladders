@@ -21,6 +21,11 @@ type Msg =
             | PlayThrough
             | NewGame
 
+type GameState =
+               Pending
+               | Ongoing
+               | Ended
+                 
 type PlayerState =
                  Playing
                  | Finished
@@ -59,9 +64,9 @@ type alias Model = {
   ,seed : Random.Seed
   ,lastRoll : Maybe DiceState
   ,whoseTurn : Maybe PlayerName
+  ,status : GameState
   ,turnCount : Int
   ,gameOver : Bool
-  ,gameCount : Int
   }
 
 
@@ -73,9 +78,9 @@ initialModel =
     ,seed = Random.initialSeed 42
     ,lastRoll = Nothing
     ,whoseTurn = Just "a"
+    ,status = Pending
     ,turnCount = 0
     ,gameOver = False
-    ,gameCount = 0
   }
 
 obtainPlayer : PlayerName -> List Player -> Maybe Player
@@ -147,15 +152,13 @@ advanceState model recurse =
         newTurnName = nextClean newTurn
         -- is game over?
         gameOver = List.length ingame'  == 0
-        gameCount' = if gameOver then model.gameCount+1 else model.gameCount
         model' = { model |
                   seed = seed',
                   lastRoll = Just dr ,
                   players = players',
                   whoseTurn = Just newTurnName,
                   turnCount=model.turnCount+incTurnCount,
-                  gameOver=gameOver,
-                  gameCount=gameCount'
+                  gameOver=gameOver
         }
       in
         if (recurse && not model'.gameOver) then (advanceState model' recurse) else model'
@@ -173,9 +176,8 @@ update action model =
     NewGame ->
       let
         seed' = model.seed
-        gameCount' = model.gameCount
       in
-        { initialModel | seed = seed' , gameCount=gameCount'}
+        { initialModel | seed = seed'}
     RollDice ->
       advanceState model False
 
@@ -229,8 +231,7 @@ drawControls model =
                     span [] [ text ("Finished: " ++ String.join "," finished)],
                     div [] [ ],
                     span [] [ text ("Is game over?: " ++ (if model.gameOver then "YES" else "NO"))],
-                    div [] [ ],
-                    span [] [ text ("game count: " ++ (toString model.gameCount))]                         
+                    div [] [ ]
            ]
 
 view : Model -> Html Msg

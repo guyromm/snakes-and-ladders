@@ -24,7 +24,7 @@ snakes_ladders = {6: 17,
          88: 36,
 }
 
-gamestates=['pending','ongoing','finished']
+gamestates=['pending','ongoing','ended']
 playerstates=['playing','finished']
 dicestates=[1,2,3,4,5,6]
 
@@ -43,15 +43,15 @@ def vg(state):
     "validate the game state"
     assert state['status'] in gamestates;
     if state['turnCount'] and state['status']=='pending': raise Exception('bad state, game begun')
-    for p in state['p']:
+    for p in state['players']:
         assert p['state'] in playerstates
         if p['turns_taken'] and state['status']=='pending': raise Exception('bad state, game has begun')
     if state['whoseTurn']:
-        p = [p for p in state['p'] if p['id']==state['whoseTurn']][0]
-        assert p['state']!='finished'
-    if len(state['p']):
-        playing = filter(lambda lp: lp['state']=='playing',state['p'])
-        if not len(playing) and state['status']!='finished': raise Exception('bad state, game has ended')
+        p = [p for p in state['players'] if p['id']==state['whoseTurn']][0]
+        assert p['state']!='ended'
+    if len(state['players']):
+        playing = filter(lambda lp: lp['state']=='playing',state['players'])
+        if not len(playing) and state['status']!='ended': raise Exception('bad state, game has ended')
     elif state['status']!='pending': raise Exception('how could have a game begun without players')
 
 @app.route("/")
@@ -61,9 +61,10 @@ def index():
 def newgame():
     gid = str(uuid.uuid1())
     cur = db.cursor()
-    s = {'p':[],
+    s = {'players':[],
          'status':'pending',
          'lastRoll':None,
+         'seed':42,
          'whoseTurn':None,
          'turnCount':0,
          'gameOver':False,
@@ -87,11 +88,11 @@ def make_turn(gid):
     vg(s)
 
     #take player
-    playing = filter(lambda lp: lp['state']=='playing',s['p'])
+    playing = filter(lambda lp: lp['state']=='playing',s['players'])
     #early exit if no one is playing
     if not len(playing): return jsonify(s)
     
-    p = [p for p in s['p'] if p['id']==s['whoseTurn']][0]
+    p = [p for p in s['players'] if p['id']==s['whoseTurn']][0]
 
     #roll the dice for current player
     roll = random.choice(dicestates)
@@ -101,12 +102,12 @@ def make_turn(gid):
     else: state=p['state']
     p['state']=state ; p['position']=pos
     p['turns_taken']+=1
-    s['p'] = map(lambda lp: lp['id']==p['id'] and p or lp,s['p'])
+    s['players'] = map(lambda lp: lp['id']==p['id'] and p or lp,s['players'])
     s['status']='ongoing' #mark game as ongoing
     
     #determine next available player
     if not len(playing):
-        s['status']='finished'
+        s['status']='ended'
         s['whoseTurn']=None
     else:
         i = playing.index(p)
@@ -116,7 +117,7 @@ def make_turn(gid):
         else:
             np = playing[0]
             s['turnCount']+=1
-        playing = filter(lambda lp: lp['state']=='playing',s['p'])
+        playing = filter(lambda lp: lp['state']=='playing',s['players'])
         if len(playing):
             s['whoseTurn']=np['id']
         else:
@@ -133,7 +134,7 @@ def addplayer(gid):
          'state':'playing',
          'position':0,
          'turns_taken':0}
-    s['p'].append(p)
+    s['players'].append(p)
     if not s['whoseTurn']: s['whoseTurn']=pid
     vg(s)
     sg(gid,s)
