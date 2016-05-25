@@ -48,15 +48,21 @@ view model =
     Just g ->
       let
         _ = Debug.log "hi there bastard" 1
+        attrdis = if (g.status==SnlMisc.Pending) then [] else [ attribute "disabled" "1" ]
       in
         div []
               [
                Html.App.map Game (Snl.view g),
-               button [ onClick AddPlayer ] [ text "Add Player" ],
+               button ([ onClick AddPlayer ] ++ attrdis) [ text "Add Player" ],
                button [ onClick New ] [ text "Restart Game" ]
               ]
           
-
+playthrough : Model -> SnlMisc.Model -> (Model,Cmd Msg)
+playthrough model g =
+    let
+        pt = if (not (g.status==SnlMisc.Ended)) then True else False
+    in
+        ({model | game = Just g}, Snl.requestMakeTurn g.id pt)
 
 update : Msg -> Model -> (Model,Cmd Msg)
 update action model =
@@ -65,6 +71,8 @@ update action model =
       (model, requestNewGame)
     NewReturned g ->
       ({model | game = Just g}, Cmd.none)
+    NewReturnedPlaythrough g ->
+      playthrough model g
     NewFailed e ->
       let
         e' = Debug.log "http err" e
@@ -85,8 +93,9 @@ update action model =
         Just mg ->
           let
               (upd,cmd) = (Snl.update act mg)
+              cmd' = Debug.log "have delegated upd through " cmd
           in
-              ({ model | game = Just upd }, Cmd.none)
+              ({ model | game = Just upd }, cmd')
     GameAction act ->
         (model, Cmd.none)
 

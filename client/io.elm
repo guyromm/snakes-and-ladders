@@ -55,7 +55,6 @@ gameStateDecoder = succeed SnlMisc.Model
                   |: (maybe ("whoseTurn" := string))
                   |: (("status" := string) `Json.Decode.andThen` gameStateNameDecoder)
                   |: ("turnCount" := int)
-                  |: ("gameOver" := bool)
 
                      
 

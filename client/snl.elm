@@ -59,7 +59,6 @@ initialModel =
     ,whoseTurn = Just "a"
     ,status = SnlMisc.Pending
     ,turnCount = 0
-    ,gameOver = False
   }
 
 obtainPlayer : PlayerName -> List Player -> Maybe Player
@@ -111,56 +110,21 @@ replcond playing p =
     Nothing ->
       p
 
-advanceState : Model -> Bool -> Model
-advanceState model recurse =
-    let
-        -- who's in game?
-        ingame = List.filter (\p -> p.state==SnlMisc.Playing) model.players
-        -- obtain current player
-        playing = Debug.log "obtainPlayer returned " (obtainPlayer (Maybe.withDefault "--" model.whoseTurn) ingame)
-        -- roll dice 
-        (dr,seed') = Random.step (Random.int 1 6 ) model.seed
-        -- make the move
-        playing' = Maybe.map (makeMove dr) playing
-        -- update model.players
-        replcond' = replcond playing'
-        players' = List.map replcond' model.players
-        -- update whoseTurn
-        ingame' = List.filter (\p -> p.state==SnlMisc.Playing) players'
-        (newTurn,incTurnCount) = Debug.log "it's now the turn of " (obtainNext (Maybe.withDefault "--" model.whoseTurn) ingame')
-        newTurnName = nextClean newTurn
-        -- is game over?
-        gameOver = List.length ingame'  == 0
-        model' = { model |
-                  seed = seed',
-                  lastRoll = Just dr ,
-                  players = players',
-                  whoseTurn = Just newTurnName,
-                  turnCount=model.turnCount+incTurnCount,
-                  gameOver=gameOver
-        }
-      in
-        if (recurse && not model'.gameOver) then (advanceState model' recurse) else model'
 
-update : SnlMisc.Msg -> Model -> (Model,Cmd SnlMisc.Msg)
+update : SnlMisc.Msg -> Model -> (Model,Cmd Msg)
 update action model =
   case action of
     SnlMisc.NoOp ->
       (model,Cmd.none)
     SnlMisc.PlayThrough ->
-      let
-        model' = advanceState model True
-      in
-        (model',Cmd.none)
+      (model,(requestMakeTurn model.id True))
     SnlMisc.NewGame ->
       let
         seed' = model.seed
       in
         ({ initialModel | seed = seed'},Cmd.none)
-    SnlMisc.RollDice ->
-      (advanceState model False,Cmd.none)
     SnlMisc.Turn ->
-        Debug.log "asking for turn" (model,requestMakeTurn) -- TODO
+        Debug.log "asking for turn" (model,(requestMakeTurn model.id False)) -- TODO
     SnlMisc.TurnFailed e ->
         let
             e' = Debug.log "turn returned http err" e
@@ -200,19 +164,26 @@ drawBoard model =
     table [ (attribute "border" "1") ]
             ([tr [] header] ++ rows)
 
+gameStateToString : SnlMisc.GameState -> String
+gameStateToString s =
+    case s of
+        SnlMisc.Pending ->
+            "pending"
+        SnlMisc.Ended ->
+            "ended"
+        SnlMisc.Ongoing ->
+            "ongoing"
+                
 drawControls model =
   let
     finished = List.map (\p -> p.name) (List.filter (\p -> p.state==SnlMisc.Finished) model.players)
-    attrdis = if model.gameOver || List.length model.players==0 then [ attribute "disabled" "1" ] else []
-    attren = if model.gameOver then [] else [ attribute "disabled" "1" ]
-    dis = [ onClick  SnlMisc.RollDice ] ++ attrdis
+    attrdis = if model.status==SnlMisc.Ended || List.length model.players==0 then [ attribute "disabled" "1" ] else []
+    attren = if model.status==SnlMisc.Ended then [] else [ attribute "disabled" "1" ]
     dis2 = [ onClick SnlMisc.PlayThrough ] ++ attrdis
     dis3 = [ onClick SnlMisc.Turn ] ++ attrdis
   in
-    div [] [ button dis [ text "Roll dice (clientside)" ],
-             button dis3 [ text "Roll dice (server)" ],
+    div [] [ button dis3 [ text "Roll dice" ],
              button dis2 [ text "Play through" ],
---             button dis3 [ text "New game" ],
                     span [] [ text ("Turn "++(toString model.turnCount))],
                     div [] [ ],
                     span [] [ text ("Last roll is " ++ (toString (Maybe.withDefault 0 model.lastRoll)))],
@@ -221,15 +192,18 @@ drawControls model =
                     div [] [ ],
                     span [] [ text ("Finished: " ++ String.join "," finished)],
                     div [] [ ],
-                    span [] [ text ("Is game over?: " ++ (if model.gameOver then "YES" else "NO"))],
+                    span [] [ text ("Game State: " ++ (gameStateToString model.status))],
                     div [] [ ],
                     span [] [ text ("Game ID: " ++ (model.id))]                        
            ]
 
            
-requestMakeTurn : Cmd SnlMisc.Msg
-requestMakeTurn =
-    Task.perform SnlMisc.TurnFailed SnlMisc.TurnReturned (Http.get makeDecode ("/game/"++"/make_turn"))
+requestMakeTurn : String -> Bool -> Cmd GameMessages.Msg
+requestMakeTurn gameid playthrough =
+    let
+        c = if playthrough then NewReturnedPlaythrough else NewReturned
+    in
+        Task.perform NewFailed c (Http.get makeDecode ("/game/"++gameid++"/make_turn"))
                
 view : Model -> Html SnlMisc.Msg
 view model =
@@ -243,8 +217,4 @@ subscriptions : Model -> Sub SnlMisc.Msg
 subscriptions model =
   Sub.none
         
-main = Html.App.program { init = (initialModel,Cmd.none),
-                          subscriptions=subscriptions,
-                          view = view,
-                          update = update }
 

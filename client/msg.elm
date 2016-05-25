@@ -6,6 +6,7 @@ type Msg =
             NoOp
             | New
             | NewReturned SnlMisc.Model
+            | NewReturnedPlaythrough SnlMisc.Model
             | NewFailed Http.Error
             | Game SnlMisc.Msg
             | AddPlayer

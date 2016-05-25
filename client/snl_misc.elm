@@ -24,7 +24,6 @@ type alias Player = { name : PlayerName,
 
 type Msg =
             NoOp
-            | RollDice
             | PlayThrough
             | NewGame
             | Turn
@@ -42,5 +41,4 @@ type alias Model = {
   ,whoseTurn : Maybe PlayerName
   ,status : GameState
   ,turnCount : Int
-  ,gameOver : Bool
   }

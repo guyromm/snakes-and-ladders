@@ -67,7 +67,6 @@ def newgame():
          'seed':42,
          'whoseTurn':None,
          'turnCount':0,
-         'gameOver':False,
          'id':gid,
     }
     ins = {'gid':gid,'state':json.dumps(s)}
@@ -91,7 +90,8 @@ def make_turn(gid):
     #take player
     playing = filter(lambda lp: lp['state']=='playing',s['players'])
     #early exit if no one is playing
-    if not len(playing): return jsonify(s)
+    if not len(playing):
+        return jsonify({'gid':gid,'state':s})
     
     p = [p for p in s['players'] if p['id']==s['whoseTurn']][0]
 
@@ -125,7 +125,7 @@ def make_turn(gid):
             s['whoseTurn']=None
             s['status']='ended'
     sg(gid,s)
-    return jsonify(s)
+    return jsonify({'gid':gid,'state':s})
 @app.route('/game/<gid>/player/new')
 def addplayer(gid):
     s = gg(gid)
