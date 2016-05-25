@@ -11,7 +11,7 @@ tmux send-keys -t $S:$I "./server.py" C-m
 inc
 tmux new-window -t $S:$I -n 'elm-watch'
 tmux send-keys -t $S:$I "cd client/" C-m
-tmux send-keys -t $S:$I "while (true ) ; do elm make gamecontrol.elm snl.elm --output snl.js ; inotifywait *elm ; done" C-m
+tmux send-keys -t $S:$I "while (true ) ; do elm make *elm --output snl.js ; inotifywait *elm ; done" C-m
 
 inc
 tmux new-window -t $S:$I -n 'emacs'

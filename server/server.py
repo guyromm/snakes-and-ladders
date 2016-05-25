@@ -41,11 +41,11 @@ def sg(gid,state):
 
 def vg(state):
     "validate the game state"
-    assert state['status'] in gamestates;
+    assert state['status'] in gamestates,"unknown game state %s"%state['status'];
     if state['turnCount'] and state['status']=='pending': raise Exception('bad state, game begun')
     for p in state['players']:
         assert p['state'] in playerstates
-        if p['turns_taken'] and state['status']=='pending': raise Exception('bad state, game has begun')
+        if p['turnsTaken'] and state['status']=='pending': raise Exception('bad state, game has begun')
     if state['whoseTurn']:
         p = [p for p in state['players'] if p['id']==state['whoseTurn']][0]
         assert p['state']!='ended'
@@ -68,6 +68,7 @@ def newgame():
          'whoseTurn':None,
          'turnCount':0,
          'gameOver':False,
+         'id':gid,
     }
     ins = {'gid':gid,'state':json.dumps(s)}
     cur.execute("insert into games (id,state) values(%(gid)s,%(state)s)",ins)
@@ -101,7 +102,7 @@ def make_turn(gid):
     if pos>=99: state='finished'
     else: state=p['state']
     p['state']=state ; p['position']=pos
-    p['turns_taken']+=1
+    p['turnsTaken']+=1
     s['players'] = map(lambda lp: lp['id']==p['id'] and p or lp,s['players'])
     s['status']='ongoing' #mark game as ongoing
     
@@ -122,7 +123,7 @@ def make_turn(gid):
             s['whoseTurn']=np['id']
         else:
             s['whoseTurn']=None
-            s['status']='finished'
+            s['status']='ended'
     sg(gid,s)
     return jsonify(s)
 @app.route('/game/<gid>/player/new')
@@ -130,15 +131,26 @@ def addplayer(gid):
     s = gg(gid)
     assert s['status']=='pending'
     pid = str(uuid.uuid1())
+    names = [p['name'] for p in s['players']]
+    if len(names):
+        mx = max(names)
+        if len(mx)==1:
+            aname = chr(ord(mx)+1)
+        else:
+            aname = mx+'*'
+    else:
+        aname = 'a'
+    assert aname not in names,"name %s already exists"%aname
     p = {'id':pid,
+         'name':aname,
          'state':'playing',
          'position':0,
-         'turns_taken':0}
+         'turnsTaken':0}
     s['players'].append(p)
     if not s['whoseTurn']: s['whoseTurn']=pid
     vg(s)
     sg(gid,s)
-    return jsonify(s)
+    return jsonify({'gid':gid,'state':s})
 
 if __name__ == "__main__":
     app.run(debug=True)
