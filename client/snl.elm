@@ -181,6 +181,9 @@ drawControls model =
     attren = if model.status==SnlMisc.Ended then [] else [ attribute "disabled" "1" ]
     dis2 = [ onClick SnlMisc.PlayThrough ] ++ attrdis
     dis3 = [ onClick SnlMisc.Turn ] ++ attrdis
+    leastTurnsTaken = (List.foldl (\p l -> if p.turnsTaken < l then p.turnsTaken else l) 100000 model.players)
+    leaders = List.filter (\p -> p.turnsTaken<=leastTurnsTaken) model.players
+    leaderNames = String.join "," (List.map (\l -> l.name) leaders)
   in
     div [] [ button dis3 [ text "Roll dice" ],
              button dis2 [ text "Play through" ],
@@ -189,6 +192,8 @@ drawControls model =
                     span [] [ text ("Last roll is " ++ (toString (Maybe.withDefault 0 model.lastRoll)))],
                     div [] [ ],
                     span [] [ text ("Next to play is " ++ (Maybe.withDefault "--" model.whoseTurn))],
+                    div [] [ ],
+                    span [] [ text ("leader names: " ++ leaderNames)],
                     div [] [ ],
                     span [] [ text ("Finished: " ++ String.join "," finished)],
                     div [] [ ],
